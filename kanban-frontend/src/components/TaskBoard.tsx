@@ -6,7 +6,7 @@ import type { DragEndEvent } from "@dnd-kit/core";
 import { DndContext, DragOverlay } from "@dnd-kit/core";
 import { useQuery, useMutation } from "@apollo/client";
 import { GET_TASKS } from "../graphql/queries";
-import { UPDATE_TASK_COLUMN } from "../graphql/mutations";
+import { UPDATE_TASK } from "../graphql/mutations";
 import TaskCard from "./TaskCard";
 
 const columns = ["todo", "doing", "done"] as const;
@@ -16,21 +16,57 @@ export default function TaskBoard() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
 
-  // Fetch tasks from backend
+  
   const { data, loading, error, refetch } = useQuery(GET_TASKS);
-  const [updateTaskColumn] = useMutation(UPDATE_TASK_COLUMN);
+  const [updateTask] = useMutation(UPDATE_TASK);
 
   const tasks: Task[] = data?.tasks || [];
 
-  // Update column in backend when task is moved
+  // Function to get new status based on column movement
+  const getStatusForColumn = (column: Task["column"]): Task["status"] => {
+    switch (column) {
+      case "todo": return "pending";
+      case "doing": return "committed";
+      case "done": return "done";
+      default: return "pending";
+    }
+  };
+
+  // Function to get reassigned status when moving backwards
+  const getReassignedStatus = (fromColumn: Task["column"], toColumn: Task["column"]): Task["status"] => {
+    // If moving from done to doing, or doing to todo, mark as reassigned
+    if ((fromColumn === "done" && toColumn === "doing") || 
+        (fromColumn === "doing" && toColumn === "todo") ||
+        (fromColumn === "done" && toColumn === "todo")) {
+      return "reassigned";
+    }
+    return getStatusForColumn(toColumn);
+  };
+
+  // Update task with both column and status in backend
   const handleTaskUpdate = async (id: string, newColumn: Task["column"]) => {
     try {
-      await updateTaskColumn({
-        variables: { id, column: newColumn },
+      const currentTask = tasks.find(t => t.id === id);
+      if (!currentTask) return;
+
+      // Determine new status based on column movement
+      let newStatus: Task["status"];
+      if (currentTask.column !== newColumn) {
+        newStatus = getReassignedStatus(currentTask.column, newColumn);
+      } else {
+        newStatus = currentTask.status;
+      }
+
+      await updateTask({
+        variables: { 
+          id, 
+          column: newColumn,
+          status: newStatus
+        },
       });
       refetch(); // Refresh UI
     } catch (error) {
-      console.error("Failed to update task column:", error);
+      console.error("Failed to update task:", error);
     }
   };
 
@@ -51,13 +87,27 @@ export default function TaskBoard() {
     handleTaskUpdate(taskId, newColumn);
   };
 
-  // Search + filter tasks per column
-  const filteredTasks = (col: Task["column"]) =>
-    tasks.filter(
-      (task) =>
-        task.column === col &&
-        task.title.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+  // Enhanced search function
+  const filteredTasks = (col: Task["column"]) => {
+    return tasks.filter((task) => {
+      // First filter by column
+      if (task.column !== col) return false;
+      
+      // If no search query, return all tasks in this column
+      if (!searchQuery.trim()) return true;
+      
+      const query = searchQuery.toLowerCase().trim();
+      
+      // Search in multiple fields
+      return (
+        task.title.toLowerCase().includes(query) ||
+        task.detail.toLowerCase().includes(query) ||
+        task.assignedTo.toLowerCase().includes(query) ||
+        task.status.toLowerCase().includes(query) ||
+        task.id.toLowerCase().includes(query)
+      );
+    });
+  };
 
   const getColumnTitle = (col: string) => {
     switch (col) {
@@ -66,6 +116,11 @@ export default function TaskBoard() {
       case "done": return "Done";
       default: return col;
     }
+  };
+
+  // Clear search function
+  const clearSearch = () => {
+    setSearchQuery("");
   };
 
   if (loading) return (
@@ -86,25 +141,26 @@ export default function TaskBoard() {
         {/* Header */}
         <div style={{ marginBottom: '32px' }}>
           <h1 style={{ fontSize: '30px', fontWeight: 'bold', color: '#1f2937', marginBottom: '24px' }}>
-            Kanban Task Manager
+           Task Manager
           </h1>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <div style={{ position: 'relative' }}>
               <input
                 type="text"
-                placeholder="Search tasks..."
+                placeholder="Search tasks by title, description, assignee, status..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{
                   paddingLeft: '40px',
-                  paddingRight: '16px',
+                  paddingRight: searchQuery ? '40px' : '16px',
                   paddingTop: '8px',
                   paddingBottom: '8px',
                   border: '1px solid #d1d5db',
                   borderRadius: '8px',
                   outline: 'none',
-                  width: '256px'
+                  width: '320px',
+                  fontSize: '14px'
                 }}
               />
               <div style={{
@@ -116,6 +172,26 @@ export default function TaskBoard() {
               }}>
                 🔍
               </div>
+              {searchQuery && (
+                <button
+                  onClick={clearSearch}
+                  style={{
+                    position: 'absolute',
+                    right: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: '#9ca3af',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '16px',
+                    padding: '2px'
+                  }}
+                  title="Clear search"
+                >
+                  ✕
+                </button>
+              )}
             </div>
             
             <button
@@ -138,57 +214,75 @@ export default function TaskBoard() {
               <span>Add Task</span>
             </button>
           </div>
+
+          {/* Search Results Info */}
+          {searchQuery && (
+            <div style={{ marginTop: '12px', fontSize: '14px', color: '#6b7280' }}>
+              Searching for: "<strong>{searchQuery}</strong>" - 
+              Found {tasks.filter(task => {
+                const query = searchQuery.toLowerCase().trim();
+                return task.title.toLowerCase().includes(query) ||
+                       task.detail.toLowerCase().includes(query) ||
+                       task.assignedTo.toLowerCase().includes(query) ||
+                       task.status.toLowerCase().includes(query) ||
+                       task.id.toLowerCase().includes(query);
+              }).length} results
+            </div>
+          )}
         </div>
 
         {/* Kanban Board - HORIZONTAL LAYOUT */}
         <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div style={{ display: 'flex', gap: '24px', overflowX: 'auto', paddingBottom: '16px' }}>
-            {columns.map((col) => (
-              <div 
-                key={col} 
-                style={{
-                  flexShrink: 0,
-                  width: '320px',
-                  backgroundColor: '#f9fafb',
-                  borderRadius: '8px',
-                  overflow: 'hidden'
-                }}
-              >
-                {/* Column Header */}
+            {columns.map((col) => {
+              const columnTasks = filteredTasks(col);
+              return (
                 <div 
+                  key={col} 
                   style={{
-                    backgroundColor: 'white',
-                    borderTop: `4px solid ${col === 'todo' ? '#9ca3af' : col === 'doing' ? '#f59e0b' : '#10b981'}`,
-                    padding: '16px'
+                    flexShrink: 0,
+                    width: '320px',
+                    backgroundColor: '#f9fafb',
+                    borderRadius: '8px',
+                    overflow: 'hidden'
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <h3 style={{ fontWeight: '600', color: '#1f2937' }}>
-                      {getColumnTitle(col)}
-                    </h3>
-                    <span 
-                      style={{
-                        backgroundColor: '#e5e7eb',
-                        color: '#374151',
-                        padding: '4px 8px',
-                        borderRadius: '9999px',
-                        fontSize: '12px',
-                        fontWeight: '500'
-                      }}
-                    >
-                      {filteredTasks(col).length}
-                    </span>
+                  {/* Column Header */}
+                  <div 
+                    style={{
+                      backgroundColor: 'white',
+                      borderTop: `4px solid ${col === 'todo' ? '#9ca3af' : col === 'doing' ? '#f59e0b' : '#10b981'}`,
+                      padding: '16px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <h3 style={{ fontWeight: '600', color: '#1f2937' }}>
+                        {getColumnTitle(col)}
+                      </h3>
+                      <span 
+                        style={{
+                          backgroundColor: '#e5e7eb',
+                          color: '#374151',
+                          padding: '4px 8px',
+                          borderRadius: '9999px',
+                          fontSize: '12px',
+                          fontWeight: '500'
+                        }}
+                      >
+                        {columnTasks.length}
+                      </span>
+                    </div>
                   </div>
-                </div>
 
-                {/* Column Content */}
-                <Column
-                  column={col}
-                  tasks={filteredTasks(col)}
-                  onTaskDrop={handleTaskUpdate}
-                />
-              </div>
-            ))}
+                  {/* Column Content */}
+                  <Column
+                    column={col}
+                    tasks={columnTasks}
+                    onTaskDrop={handleTaskUpdate}
+                  />
+                </div>
+              );
+            })}
           </div>
 
           {/* Drag Overlay - Shows task being dragged */}

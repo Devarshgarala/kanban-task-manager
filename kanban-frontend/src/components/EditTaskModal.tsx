@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useMutation } from "@apollo/client";
 import { UPDATE_TASK } from "../graphql/mutations";
 import type { Task } from "../types/types";
+import DeleteTaskModal from "./DeleteTaskModal";
 
 interface EditTaskModalProps {
   task: Task;
@@ -27,6 +28,7 @@ export default function EditTaskModal({ task, onClose, refetch }: EditTaskModalP
   const [updateTask, { loading }] = useMutation(UPDATE_TASK);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   // Handle form submission
   const handleSubmit = async () => {
@@ -81,150 +83,371 @@ export default function EditTaskModal({ task, onClose, refetch }: EditTaskModalP
     return () => document.removeEventListener("keydown", handleEscape);
   }, [onClose]);
 
+  const backdropStyle: React.CSSProperties = {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 50,
+    padding: '16px'
+  };
+
+  const modalStyle: React.CSSProperties = {
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    padding: '24px',
+    width: '100%',
+    maxWidth: '448px',
+    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+    transform: 'scale(1)',
+    transition: 'all 0.2s ease-in-out'
+  };
+
+  const headerStyle: React.CSSProperties = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '24px'
+  };
+
+  const titleStyle: React.CSSProperties = {
+    fontSize: '20px',
+    fontWeight: 'bold',
+    color: '#1f2937',
+    margin: 0
+  };
+
+  const closeButtonStyle: React.CSSProperties = {
+    color: '#9ca3af',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: '4px',
+    borderRadius: '4px',
+    transition: 'color 0.2s ease',
+    fontSize: '0'
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '8px 12px',
+    border: '1px solid #d1d5db',
+    borderRadius: '8px',
+    fontSize: '14px',
+    transition: 'all 0.2s ease',
+    outline: 'none'
+  };
+
+  const inputFocusStyle: React.CSSProperties = {
+    ...inputStyle,
+    borderColor: '#3b82f6',
+    boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
+  };
+
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#374151',
+    marginBottom: '8px'
+  };
+
+  const textareaStyle: React.CSSProperties = {
+    ...inputStyle,
+    minHeight: '80px',
+    resize: 'none' as const,
+    fontFamily: 'inherit'
+  };
+
+  const selectStyle: React.CSSProperties = {
+    ...inputStyle,
+    cursor: 'pointer'
+  };
+
+  const buttonStyle: React.CSSProperties = {
+    padding: '8px 16px',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    border: 'none',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
+  };
+
+  const primaryButtonStyle: React.CSSProperties = {
+    ...buttonStyle,
+    backgroundColor: '#3b82f6',
+    color: 'white',
+    padding: '10px 20px'
+  };
+
+  const secondaryButtonStyle: React.CSSProperties = {
+    ...buttonStyle,
+    backgroundColor: '#f3f4f6',
+    color: '#374151'
+  };
+
+  const dangerButtonStyle: React.CSSProperties = {
+    ...buttonStyle,
+    backgroundColor: '#fef2f2',
+    color: '#dc2626',
+    border: '1px solid #fecaca'
+  };
+
+  const messageStyle: React.CSSProperties = {
+    padding: '12px',
+    borderRadius: '8px',
+    fontSize: '14px',
+    marginBottom: '16px'
+  };
+
+  const successMessageStyle: React.CSSProperties = {
+    ...messageStyle,
+    backgroundColor: '#f0fdf4',
+    color: '#166534',
+    border: '1px solid #bbf7d0',
+    fontWeight: '500'
+  };
+
+  const errorMessageStyle: React.CSSProperties = {
+    ...messageStyle,
+    backgroundColor: '#fef2f2',
+    color: '#dc2626',
+    border: '1px solid #fecaca'
+  };
+
   return (
-    <div 
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-      onClick={handleBackdropClick}
-    >
-      <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl transform transition-all">
-        {/* Modal Header */}
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-gray-800">Edit Task</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Success Message */}
-        {successMessage && (
-          <div className="mb-4 p-3 bg-green-100 border border-green-200 text-green-700 rounded-lg text-sm font-medium">
-            {successMessage}
-          </div>
-        )}
-
-        {/* Error Message */}
-        {errorMessage && (
-          <div className="mb-4 p-3 bg-red-100 border border-red-200 text-red-700 rounded-lg text-sm">
-            {errorMessage}
-          </div>
-        )}
-
-        {/* Form Fields */}
-        <div className="space-y-4">
-          {/* Title */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Task Title *
-            </label>
-            <input
-              type="text"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              placeholder="Enter task title"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              maxLength={100}
-              required
-            />
+    <>
+      <div style={backdropStyle} onClick={handleBackdropClick}>
+        <div style={modalStyle}>
+          {/* Modal Header */}
+          <div style={headerStyle}>
+            <h2 style={titleStyle}>Edit Task</h2>
+            <button
+              onClick={onClose}
+              style={closeButtonStyle}
+              onMouseEnter={(e) => e.currentTarget.style.color = '#6b7280'}
+              onMouseLeave={(e) => e.currentTarget.style.color = '#9ca3af'}
+            >
+              <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
 
-          {/* Detail */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Description
-            </label>
-            <textarea
-              value={formData.detail}
-              onChange={(e) => setFormData({ ...formData, detail: e.target.value })}
-              placeholder="Describe the task details..."
-              rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-              maxLength={500}
-            />
-            <div className="text-xs text-gray-500 mt-1">
-              {formData.detail.length}/500 characters
+          {/* Success Message */}
+          {successMessage && (
+            <div style={successMessageStyle}>
+              {successMessage}
+            </div>
+          )}
+
+          {/* Error Message */}
+          {errorMessage && (
+            <div style={errorMessageStyle}>
+              {errorMessage}
+            </div>
+          )}
+
+          {/* Form Fields */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* Title */}
+            <div>
+              <label style={labelStyle}>
+                Task Title *
+              </label>
+              <input
+                type="text"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                placeholder="Enter task title"
+                style={inputStyle}
+                onFocus={(e) => Object.assign(e.target.style, inputFocusStyle)}
+                onBlur={(e) => Object.assign(e.target.style, inputStyle)}
+                maxLength={100}
+                required
+              />
+            </div>
+
+            {/* Detail */}
+            <div>
+              <label style={labelStyle}>
+                Description
+              </label>
+              <textarea
+                value={formData.detail}
+                onChange={(e) => setFormData({ ...formData, detail: e.target.value })}
+                placeholder="Describe the task details..."
+                rows={4}
+                style={textareaStyle}
+                onFocus={(e) => Object.assign(e.target.style, { ...textareaStyle, borderColor: '#3b82f6', boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)' })}
+                onBlur={(e) => Object.assign(e.target.style, textareaStyle)}
+                maxLength={500}
+              />
+              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                {formData.detail.length}/500 characters
+              </div>
+            </div>
+
+            {/* Assigned To */}
+            <div>
+              <label style={labelStyle}>
+                Assigned To
+              </label>
+              <input
+                type="text"
+                value={formData.assignedTo}
+                onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
+                placeholder="Enter assignee name"
+                style={inputStyle}
+                onFocus={(e) => Object.assign(e.target.style, inputFocusStyle)}
+                onBlur={(e) => Object.assign(e.target.style, inputStyle)}
+                maxLength={50}
+              />
+            </div>
+
+            {/* Column */}
+            <div>
+              <label style={labelStyle}>
+                Column
+              </label>
+              <select
+                value={formData.column}
+                onChange={(e) => setFormData({ ...formData, column: e.target.value as "todo" | "doing" | "done" })}
+                style={selectStyle}
+                onFocus={(e) => Object.assign(e.target.style, { ...selectStyle, borderColor: '#3b82f6', boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)' })}
+                onBlur={(e) => Object.assign(e.target.style, selectStyle)}
+              >
+                <option value="todo">To Do</option>
+                <option value="doing">Doing</option>
+                <option value="done">Done</option>
+              </select>
+            </div>
+
+            {/* Status */}
+            <div>
+              <label style={labelStyle}>
+                Status
+              </label>
+              <select
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value as "pending" | "committed" | "done" | "reassigned" })}
+                style={selectStyle}
+                onFocus={(e) => Object.assign(e.target.style, { ...selectStyle, borderColor: '#3b82f6', boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)' })}
+                onBlur={(e) => Object.assign(e.target.style, selectStyle)}
+              >
+                <option value="pending">Pending</option>
+                <option value="committed">Committed</option>
+                <option value="done">Done</option>
+                <option value="reassigned">Reassigned</option>
+              </select>
             </div>
           </div>
 
-          {/* Assigned To */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Assigned To
-            </label>
-            <input
-              type="text"
-              value={formData.assignedTo}
-              onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
-              placeholder="Enter assignee name"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              maxLength={50}
-            />
-          </div>
-
-          {/* Column */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Column
-            </label>
-            <select
-              value={formData.column}
-              onChange={(e) => setFormData({ ...formData, column: e.target.value as "todo" | "doing" | "done" })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          {/* Action Buttons */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            paddingTop: '24px', 
+            marginTop: '24px', 
+            borderTop: '1px solid #e5e7eb' 
+          }}>
+            {/* Delete Button */}
+            <button
+              type="button"
+              onClick={() => setShowDeleteModal(true)}
+              disabled={loading}
+              style={{
+                ...dangerButtonStyle,
+                opacity: loading ? 0.5 : 1,
+                cursor: loading ? 'not-allowed' : 'pointer'
+              }}
+              onMouseEnter={(e) => !loading && (e.currentTarget.style.backgroundColor = '#fecaca')}
+              onMouseLeave={(e) => !loading && (e.currentTarget.style.backgroundColor = '#fef2f2')}
             >
-              <option value="todo">To Do</option>
-              <option value="doing">Doing</option>
-              <option value="done">Done</option>
-            </select>
-          </div>
-
-          {/* Status */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Status
-            </label>
-            <select
-              value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value as "pending" | "committed" | "done" | "reassigned" })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="pending">Pending</option>
-              <option value="committed">Committed</option>
-              <option value="done">Done</option>
-              <option value="reassigned">Reassigned</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex justify-end space-x-3 pt-6 mt-6 border-t border-gray-200">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={loading}
-            className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={loading || !formData.title.trim()}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-          >
-            {loading && (
-              <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
-            )}
-            <span>{loading ? "Saving..." : "Save Changes"}</span>
-          </button>
+              <span>Delete</span>
+            </button>
+
+            {/* Save/Cancel Buttons */}
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={loading}
+                style={{
+                  ...secondaryButtonStyle,
+                  opacity: loading ? 0.5 : 1,
+                  cursor: loading ? 'not-allowed' : 'pointer'
+                }}
+                onMouseEnter={(e) => !loading && (e.currentTarget.style.backgroundColor = '#e5e7eb')}
+                onMouseLeave={(e) => !loading && (e.currentTarget.style.backgroundColor = '#f3f4f6')}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={loading || !formData.title.trim()}
+                style={{
+                  ...primaryButtonStyle,
+                  opacity: (loading || !formData.title.trim()) ? 0.5 : 1,
+                  cursor: (loading || !formData.title.trim()) ? 'not-allowed' : 'pointer'
+                }}
+                onMouseEnter={(e) => !(loading || !formData.title.trim()) && (e.currentTarget.style.backgroundColor = '#2563eb')}
+                onMouseLeave={(e) => !(loading || !formData.title.trim()) && (e.currentTarget.style.backgroundColor = '#3b82f6')}
+              >
+                {loading && (
+                  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" style={{ animation: 'spin 1s linear infinite' }}>
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" style={{ opacity: 0.25 }}></circle>
+                    <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" style={{ opacity: 0.75 }}></path>
+                  </svg>
+                )}
+                <span>{loading ? "Saving..." : "Save Changes"}</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <DeleteTaskModal
+          task={task}
+          onClose={() => {
+            setShowDeleteModal(false);
+            // Close the edit modal as well when delete modal closes
+          }}
+          refetch={() => {
+            refetch();
+            onClose(); // Close edit modal after successful delete
+          }}
+        />
+      )}
+
+      {/* Add spinning animation keyframes */}
+      <style>
+        {`
+          @keyframes spin {
+            from {
+              transform: rotate(0deg);
+            }
+            to {
+              transform: rotate(360deg);
+            }
+          }
+        `}
+      </style>
+    </>
   );
 }

@@ -11,8 +11,13 @@ interface TaskCardProps {
 }
 
 export default function TaskCard({ task, onTaskDrop }: TaskCardProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [isDragDisabled, setIsDragDisabled] = useState(false);
+  const { refetch } = useQuery(GET_TASKS);
+
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
+    disabled: isDragDisabled, // Disable drag when hovering over edit button
   });
 
   const style = {
@@ -21,9 +26,6 @@ export default function TaskCard({ task, onTaskDrop }: TaskCardProps) {
     zIndex: isDragging ? 9999 : 1,
     cursor: isDragging ? 'grabbing' : 'grab',
   };
-
-  const [isEditing, setIsEditing] = useState(false);
-  const { refetch } = useQuery(GET_TASKS);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -54,6 +56,33 @@ export default function TaskCard({ task, onTaskDrop }: TaskCardProps) {
     return colors[index];
   };
 
+  // Handle edit button click with multiple event preventions
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsEditing(true);
+  };
+
+  // Handle mouse events for edit button area
+  const handleEditMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  // Handle touch events for edit button area
+  const handleEditTouchStart = (e: React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleEditMouseEnter = () => {
+    setIsDragDisabled(true);
+  };
+
+  const handleEditMouseLeave = () => {
+    setIsDragDisabled(false);
+  };
+
   const statusColors = getStatusColor(task.status);
 
   return (
@@ -70,8 +99,8 @@ export default function TaskCard({ task, onTaskDrop }: TaskCardProps) {
           marginBottom: '12px',
           transition: 'all 0.2s ease',
         }}
-        {...listeners}
-        {...attributes}
+        {...(isDragDisabled ? {} : listeners)}
+        {...(isDragDisabled ? {} : attributes)}
       >
         {/* Task Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
@@ -86,27 +115,42 @@ export default function TaskCard({ task, onTaskDrop }: TaskCardProps) {
           }}>
             {task.title}
           </h4>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsEditing(true);
-            }}
-            style={{
-              color: '#9ca3af',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
+          
+          {/* Edit Button with No-Drag Zone */}
+          <div
+            onMouseEnter={handleEditMouseEnter}
+            onMouseLeave={handleEditMouseLeave}
+            style={{ 
               padding: '4px',
               borderRadius: '4px',
-              marginLeft: '8px',
-              flexShrink: 0,
-              fontSize: '16px',
-              lineHeight: 1
+              cursor: 'pointer',
             }}
-            title="Edit task"
           >
-            ⋯
-          </button>
+            <button
+              onClick={handleEditClick}
+              onMouseDown={handleEditMouseDown}
+              onPointerDown={handleEditMouseDown}
+              onTouchStart={handleEditTouchStart}
+              style={{
+                color: '#9ca3af',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '4px',
+                borderRadius: '4px',
+                fontSize: '16px',
+                lineHeight: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minWidth: '24px',
+                minHeight: '24px'
+              }}
+              title="Edit task"
+            >
+              ⋯
+            </button>
+          </div>
         </div>
 
         {/* Task Description */}
